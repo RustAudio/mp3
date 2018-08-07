@@ -1,0 +1,6 @@
+[package]
+name = "mp3"
+version = "0.1.0"
+authors = ["The mp3 crate contributors"]
+
+[dependencies]
