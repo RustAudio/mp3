@@ -1,4 +1,4 @@
-use error::Mp3Error;
+use ::Mp3Error;
 use tables::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,24 +14,6 @@ pub enum Layer {
     LayerI,
     LayerII,
     LayerIII,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Protection {
-    Yes,
-    No,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Private {
-    Yes,
-    No,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Padding {
-    Yes,
-    No,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,17 +42,6 @@ pub enum ModeExtension {
     Stereo(bool, bool),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Copyright {
-    Yes,
-    No,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Original {
-    Yes,
-    No,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Emphasis {
@@ -84,24 +55,24 @@ pub enum Emphasis {
 pub struct FrameHeader {
     version: Version,
     layer: Layer,
-    protection: Protection,
-    bitrate: u16, // kbps
-    sampling_rate: u16, // Hz
-    padding: Padding,
-    private: Private,
+    protection: bool,
+    pub bitrate: u16, // kbps
+    pub sampling_rate: u16, // Hz
+    pub padding: bool,
+    private: bool,
     mode: Mode,
     mode_extension: ModeExtension,
-    copyright: Copyright,
-    original: Original,
+    copyright: bool,
+    original: bool,
     emphasis: Emphasis,
 }
 
 
-pub fn frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
+pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     let header = &data[..4];
 
     // Sync word check
-    if (header[0] != 255 as u8) && (header[1] < 0b11100000u8) {
+    if (header[0] != 255_u8) && (header[1] < 0b11100000u8) {
         return Err(Mp3Error::HeaderError)
     }
 
@@ -120,11 +91,7 @@ pub fn frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         _            => Err(Mp3Error::HeaderError),
     }?;
 
-    let protection = match header[1] & 0b00000001u8 {
-        0b00000001u8 => Protection::Yes,
-        0u8          => Protection::No,
-        _            => unreachable!(),
-    };
+    let protection = header[1] & 0b00000001u8 != 0;
 
     let bitrate_index = (header[2] >> 4) as usize;
 
@@ -153,17 +120,9 @@ pub fn frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         _                 => Err(Mp3Error::HeaderError),
     }?;
 
-    let padding = match header[2] & 0b00000010u8 {
-        0u8          => Padding::No,
-        0b00000010u8 => Padding::Yes,
-        _            => unreachable!(),
-    };
+    let padding = header[2] & 0b00000010u8 != 0;
 
-    let private = match header[2] & 1u8 {
-        0u8 => Private::No,
-        1u8 => Private::Yes,
-        _   => unreachable!(),
-    };
+    let private = header[2] & 0b00000001u8 != 0;
 
     let mode = match header[3] & 0b11000000u8 {
         0u8        => Mode::Stereo,
@@ -192,17 +151,9 @@ pub fn frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         },
     };
 
-    let copyright = match header[3] & 0b00001000u8 {
-        0b00000000u8 => Copyright::No,
-        0b00001000u8 => Copyright::Yes,
-        _            => unreachable!(),
-    };
+    let copyright = header[3] & 0b00001000u8 != 0;
 
-    let original = match header[3] & 0b00000100u8 {
-        0b00000000u8 => Original::No,
-        0b00000100u8 => Original::Yes,
-        _            => unreachable!(),
-    };
+    let original = header[3] & 0b00000100u8 != 0;
 
     let emphasis = match header[3] & 0b00000011u8 {
         0b00000000u8 => Emphasis::None,
@@ -226,18 +177,4 @@ pub fn frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         original,
         emphasis,
     })
-}
-
-impl FrameHeader {
-    pub fn bitrate(&self) -> u16 {
-        self.bitrate
-    }
-
-    pub fn sampling_rate(&self) -> u16 {
-        self.sampling_rate
-    }
-
-    pub fn padding(&self) -> Padding {
-        self.padding.clone()
-    }
 }
