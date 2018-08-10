@@ -1,5 +1,5 @@
-use ::Mp3Error;
 use tables::*;
+use Mp3Error;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Version {
@@ -42,56 +42,67 @@ pub enum ModeExtension {
     Stereo(bool, bool),
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Emphasis {
     None,
-    Ms50_15,  // 50/15 ms
+    Ms50_15, // 50/15 ms
     Reserved,
-    CcittJ17,  // CCITT J.17
+    CcittJ17, // CCITT J.17
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameHeader {
+    // MPEG Audio version
     version: Version,
-    layer: Layer,
+    // MPEG layer
+    pub layer: Layer,
+    // Indicates that frame is protected by CRC (16 bit CRC follows header).
     protection: bool,
-    pub bitrate: u16, // kbps
-    pub sampling_rate: u16, // Hz
+    // Bit rate
+    pub bitrate: u16,
+    // Sampling rate
+    pub sampling_rate: u16,
+    // Indicates that frame is padded with one extra slot (32 bits for Layer I, 8 bits for others).
     pub padding: bool,
+    // Bit for application-specific triggers.
     private: bool,
+    // Channel Mode
     mode: Mode,
+    // Only used in Joint stereo mode to join informations that are of no use for stereo effect.
     mode_extension: ModeExtension,
+    // Indicates that audio is copyrighted.
     copyright: bool,
+    // Indicates that the frame is located on its original media.
     original: bool,
+    // Tells the decoder that the file must be de-emphasized. Rarely used.
     emphasis: Emphasis,
 }
-
 
 pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     let header = &data[..4];
 
     // Sync word check
-    if (header[0] != 255_u8) && (header[1] < 0b11100000u8) {
-        return Err(Mp3Error::HeaderError)
+    if (header[0] != 0xff_u8) && (header[1] < 0xe0_u8) {
+        return Err(Mp3Error::HeaderError);
     }
 
-    let version = match header[1] & 0b00011000u8 {
-        0b00000000u8 => Ok(Version::Mpeg2_5),
-        0b00001000u8 => Ok(Version::Reserved),
-        0b00010000u8 => Ok(Version::Mpeg2),
-        0b00011000u8 => Ok(Version::Mpeg1),
-        _            => Err(Mp3Error::HeaderError),
-    }?;
+    let version = match header[1] & 0x18_u8 {
+        0 => Version::Mpeg2_5,
+        0x08_u8 => Version::Reserved,
+        0x10_u8 => Version::Mpeg2,
+        0x18_u8 => Version::Mpeg1,
+        _ => return Err(Mp3Error::HeaderError),
+    };
 
-    let layer = match header[1] & 0b00000110u8 {
-        0b00000010u8 => Ok(Layer::LayerIII),
-        0b00000100u8 => Ok(Layer::LayerII),
-        0b00000110u8 => Ok(Layer::LayerI),
-        _            => Err(Mp3Error::HeaderError),
-    }?;
+    let layer = match header[1] & 0x06_u8 {
+        0x02_u8 => Layer::LayerIII,
+        0x04_u8 => Layer::LayerII,
+        0x06_u8 => Layer::LayerI,
+        _ => return Err(Mp3Error::HeaderError),
+    };
 
-    let protection = header[1] & 0b00000001u8 != 0;
+    // Protected if the bit is 0
+    let protection = header[1] & 0x01_u8 == 0;
 
     let bitrate_index = (header[2] >> 4) as usize;
 
@@ -100,67 +111,67 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     }
 
     let bitrate = match (&version, &layer) {
-        (&Version::Mpeg1, &Layer::LayerI)   => BITRATE_INDEX[0][bitrate_index],
-        (&Version::Mpeg1, &Layer::LayerII)  => BITRATE_INDEX[1][bitrate_index],
+        (&Version::Mpeg1, &Layer::LayerI) => BITRATE_INDEX[0][bitrate_index],
+        (&Version::Mpeg1, &Layer::LayerII) => BITRATE_INDEX[1][bitrate_index],
         (&Version::Mpeg1, &Layer::LayerIII) => BITRATE_INDEX[2][bitrate_index],
-        (_, &Layer::LayerI)                 => BITRATE_INDEX[3][bitrate_index],
-        (_, _)                              => BITRATE_INDEX[4][bitrate_index],
+        (_, &Layer::LayerI) => BITRATE_INDEX[3][bitrate_index],
+        (_, _) => BITRATE_INDEX[4][bitrate_index],
     };
 
-    let sampling_rate_index = ((header[2] & 0b00001100u8) >> 2) as usize;
+    let sampling_rate_index = ((header[2] & 0x0c_u8) >> 2) as usize;
 
     if sampling_rate_index == 3 {
         return Err(Mp3Error::HeaderError);
     }
 
     let sampling_rate = match &version {
-        &Version::Mpeg1   => Ok(SAMPLING_RATE[0][sampling_rate_index]),
-        &Version::Mpeg2   => Ok(SAMPLING_RATE[1][sampling_rate_index]),
-        &Version::Mpeg2_5 => Ok(SAMPLING_RATE[2][sampling_rate_index]),
-        _                 => Err(Mp3Error::HeaderError),
-    }?;
-
-    let padding = header[2] & 0b00000010u8 != 0;
-
-    let private = header[2] & 0b00000001u8 != 0;
-
-    let mode = match header[3] & 0b11000000u8 {
-        0u8        => Mode::Stereo,
-        0b01000000 => Mode::JointStereo,
-        0b10000000 => Mode::DualChannel,
-        0b11000000 => Mode::Mono,
-        _          => unreachable!(),
+        &Version::Mpeg1 => SAMPLING_RATE[0][sampling_rate_index],
+        &Version::Mpeg2 => SAMPLING_RATE[1][sampling_rate_index],
+        &Version::Mpeg2_5 => SAMPLING_RATE[2][sampling_rate_index],
+        _ => return Err(Mp3Error::HeaderError),
     };
 
-    let mode_extension_bits = header[3] & 0b00110000u8;
+    let padding = header[2] & 0x02_u8 != 0;
+
+    let private = header[2] & 0x01_u8 != 0;
+
+    let mode = match header[3] & 0xc0_u8 {
+        0 => Mode::Stereo,
+        0x40_u8 => Mode::JointStereo,
+        0x80_u8 => Mode::DualChannel,
+        0xc0_u8 => Mode::Mono,
+        _ => unreachable!(),
+    };
+
+    let mode_extension_bits = header[3] & 0x30_u8;
 
     let mode_extension = match &layer {
         &Layer::LayerIII => match mode_extension_bits {
-            0u8          => ModeExtension::Stereo(false, false),
-            0b00010000u8 => ModeExtension::Stereo(true, false),
-            0b00100000u8 => ModeExtension::Stereo(false, true),
-            0b00110000u8 => ModeExtension::Stereo(true, true),
-            _            => unreachable!(),
+            0 => ModeExtension::Stereo(false, false),
+            0x10_u8 => ModeExtension::Stereo(true, false),
+            0x20_u8 => ModeExtension::Stereo(false, true),
+            0x30_u8 => ModeExtension::Stereo(true, true),
+            _ => unreachable!(),
         },
         &Layer::LayerI | &Layer::LayerII => match mode_extension_bits {
-            0u8          => ModeExtension::Bands(4),
-            0b00010000u8 => ModeExtension::Bands(8),
-            0b00100000u8 => ModeExtension::Bands(12),
-            0b00110000u8 => ModeExtension::Bands(16),
-            _            => unreachable!(),
+            0 => ModeExtension::Bands(4),
+            0x10_u8 => ModeExtension::Bands(8),
+            0x20_u8 => ModeExtension::Bands(12),
+            0x30_u8 => ModeExtension::Bands(16),
+            _ => unreachable!(),
         },
     };
 
-    let copyright = header[3] & 0b00001000u8 != 0;
+    let copyright = header[3] & 0x08_u8 != 0;
 
-    let original = header[3] & 0b00000100u8 != 0;
+    let original = header[3] & 0x04_u8 != 0;
 
-    let emphasis = match header[3] & 0b00000011u8 {
-        0b00000000u8 => Emphasis::None,
-        0b00000001u8 => Emphasis::Ms50_15,
-        0b00000010u8 => Emphasis::Reserved,
-        0b00000011u8 => Emphasis::CcittJ17,
-        _            => unreachable!(),
+    let emphasis = match header[3] & 0x03_u8 {
+        0 => Emphasis::None,
+        0x01_u8 => Emphasis::Ms50_15,
+        0x02_u8 => Emphasis::Reserved,
+        0x03_u8 => Emphasis::CcittJ17,
+        _ => unreachable!(),
     };
 
     Ok(FrameHeader {
