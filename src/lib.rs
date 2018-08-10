@@ -51,8 +51,8 @@ pub fn trim_data(data: &[u8]) -> Result<&[u8], Mp3Error> {
 pub fn frame_size(header: &FrameHeader) -> usize {
     (144000_usize * (header.bitrate as usize)) / (header.sampling_rate as usize)
         + match (header.padding, &header.layer) {
-            (true, &Layer::LayerI) => 32_usize,
-            (true, _) => 8_usize,
+            (true, &Layer::LayerI) => 4_usize,
+            (true, _) => 1_usize,
             _ => 0_usize,
         }
 }
