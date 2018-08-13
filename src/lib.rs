@@ -52,18 +52,27 @@ pub fn frame_size(header: &FrameHeader) -> Option<usize> {
         Bitrate::FreeFormat => None,
 
         Bitrate::Indexed(bitrate) => {
+            // The number of bytes a slot occupies
+            // This is described in sections 2.1 and 2.4.2.1 of ISO/IEC 11172-3
             let slot_size = match &header.layer {
                 &Layer::LayerI => 4_usize,
                 _ => 1_usize,
             };
-            let padding = header.padding as usize;
+
+            // Now compute the number of slots.
+            // This is described in section 2.4.3.1 of ISO/IEC 11172-3
+
             let multiplier = match &header.layer {
                 &Layer::LayerI => 12,
                 _ => 144000,
             };
 
-            let slot_count =
-                (multiplier * (bitrate as usize)) / (header.sampling_rate as usize) + padding;
+            let mut slot_count =
+                (multiplier * (bitrate as usize)) / (header.sampling_rate as usize);
+
+            if header.padding {
+                slot_count += 1;
+            }
 
             Some(slot_count * slot_size)
         }
