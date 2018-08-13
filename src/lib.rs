@@ -26,8 +26,8 @@ impl From<str::Utf8Error> for Mp3Error {
 // Trim ID3 tag from data and find first frame
 pub fn trim_data(data: &[u8]) -> Result<&[u8], Mp3Error> {
     // Check if it is ID3v2
-    match str::from_utf8(&data[..3]) {
-        Ok("ID3") => {
+    match &data[..3] {
+        b"ID3" => {
             let id3_len = (data[6] as usize) * 128 * 128 * 128
                 + (data[7] as usize) * 128 * 128
                 + (data[8] as usize) * 128
@@ -35,24 +35,41 @@ pub fn trim_data(data: &[u8]) -> Result<&[u8], Mp3Error> {
 
             return Ok(&data[10 + id3_len..]);
         }
-        Ok(_) => {
-            let len = data.len();
+        _ => {
+            let start_of_tag = data.len() - ID3V1_LEN;
 
             // Check if it is ID3v1
-            match str::from_utf8(&data[len - ID3V1_LEN..len - ID3V1_LEN + 3]) {
-                Ok("TAG") => return Ok(&data[..len - ID3V1_LEN]),
+            match &data[start_of_tag..start_of_tag + 3] {
+                b"TAG" => return Ok(&data[..start_of_tag]),
                 _ => return Err(Mp3Error::ID3Error),
             }
         }
-        Err(e) => Err(Mp3Error::Utf8Error(e)),
     }
 }
 
-pub fn frame_size(header: &FrameHeader) -> usize {
-    (144000_usize * (header.bitrate as usize)) / (header.sampling_rate as usize)
-        + match (header.padding, &header.layer) {
-            (true, &Layer::LayerI) => 4_usize,
-            (true, _) => 1_usize,
-            _ => 0_usize,
+pub fn frame_size(header: &FrameHeader) -> Option<usize> {
+    match header.bitrate {
+        Bitrate::FreeFormat => None,
+
+        Bitrate::Indexed(bitrate) => {
+            let padding_size = match (header.padding, &header.layer) {
+                (true, &Layer::LayerI) => 4_usize,
+                (true, _) => 1_usize,
+                _ => 0_usize,
+            };
+
+            let samples_per_frame = match header.layer {
+                Layer::LayerI => 384_usize,
+                _ => 1152_usize,
+            };
+
+            let byterate = bitrate as usize * 1000 / 8;
+
+            let frame_size_times_sampling_rate = samples_per_frame * byterate;
+
+            let frame_size = frame_size_times_sampling_rate / (header.sampling_rate as usize);
+
+            Some(frame_size + padding_size)
         }
+    }
 }

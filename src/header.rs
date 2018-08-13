@@ -17,6 +17,12 @@ pub enum Layer {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Bitrate {
+    Indexed(u16),
+    FreeFormat,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Mode {
     Stereo,
     JointStereo,
@@ -59,7 +65,7 @@ pub struct FrameHeader {
     // Indicates that frame is protected by CRC (16 bit CRC follows header).
     protection: bool,
     // Bit rate
-    pub bitrate: u16,
+    pub bitrate: Bitrate,
     // Sampling rate
     pub sampling_rate: u16,
     // Indicates that frame is padded with one extra slot (32 bits for Layer I, 8 bits for others).
@@ -82,7 +88,7 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     let header = &data[..4];
 
     // Sync word check
-    if (header[0] != 0xff_u8) && (header[1] < 0xe0_u8) {
+    if (header[0] != 0xff_u8) || (header[1] & 0xe0_u8 != 0xe0_u8) {
         return Err(Mp3Error::HeaderError);
     }
 
@@ -106,16 +112,22 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
 
     let bitrate_index = (header[2] >> 4) as usize;
 
-    if bitrate_index == 0 || bitrate_index == 15 {
+    if bitrate_index == 15 {
         return Err(Mp3Error::HeaderError);
     }
 
-    let bitrate = match (&version, &layer) {
-        (&Version::Mpeg1, &Layer::LayerI) => BITRATE_INDEX[0][bitrate_index],
-        (&Version::Mpeg1, &Layer::LayerII) => BITRATE_INDEX[1][bitrate_index],
-        (&Version::Mpeg1, &Layer::LayerIII) => BITRATE_INDEX[2][bitrate_index],
-        (_, &Layer::LayerI) => BITRATE_INDEX[3][bitrate_index],
-        (_, _) => BITRATE_INDEX[4][bitrate_index],
+    let bitrate = if bitrate_index != 0 {
+        let rate = match (&version, &layer) {
+            (&Version::Mpeg1, &Layer::LayerI) => BITRATE_INDEX[0][bitrate_index],
+            (&Version::Mpeg1, &Layer::LayerII) => BITRATE_INDEX[1][bitrate_index],
+            (&Version::Mpeg1, &Layer::LayerIII) => BITRATE_INDEX[2][bitrate_index],
+            (_, &Layer::LayerI) => BITRATE_INDEX[3][bitrate_index],
+            (_, _) => BITRATE_INDEX[4][bitrate_index],
+        };
+
+        Bitrate::Indexed(rate)
+    } else {
+        Bitrate::FreeFormat
     };
 
     let sampling_rate_index = ((header[2] & 0x0c_u8) >> 2) as usize;
