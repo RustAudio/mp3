@@ -52,24 +52,20 @@ pub fn frame_size(header: &FrameHeader) -> Option<usize> {
         Bitrate::FreeFormat => None,
 
         Bitrate::Indexed(bitrate) => {
-            let padding_size = match (header.padding, &header.layer) {
-                (true, &Layer::LayerI) => 4_usize,
-                (true, _) => 1_usize,
-                _ => 0_usize,
+            let slot_size = match &header.layer {
+                &Layer::LayerI => 4_usize,
+                _ => 1_usize,
+            };
+            let padding = header.padding as usize;
+            let multiplier = match &header.layer {
+                &Layer::LayerI => 12,
+                _ => 144000,
             };
 
-            let samples_per_frame = match header.layer {
-                Layer::LayerI => 384_usize,
-                _ => 1152_usize,
-            };
+            let slot_count =
+                (multiplier * (bitrate as usize)) / (header.sampling_rate as usize) + padding;
 
-            let byterate = bitrate as usize * 1000 / 8;
-
-            let frame_size_times_sampling_rate = samples_per_frame * byterate;
-
-            let frame_size = frame_size_times_sampling_rate / (header.sampling_rate as usize);
-
-            Some(frame_size + padding_size)
+            Some(slot_count * slot_size)
         }
     }
 }
