@@ -1,7 +1,7 @@
 use tables::*;
 use Mp3Error;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Version {
     Mpeg2_5,
     Reserved,
@@ -9,20 +9,20 @@ pub enum Version {
     Mpeg1,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Layer {
     LayerI,
     LayerII,
     LayerIII,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Bitrate {
     Indexed(u16),
     FreeFormat,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
     Stereo,
     JointStereo,
@@ -117,11 +117,11 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     }
 
     let bitrate = if bitrate_index != 0 {
-        let rate = match (&version, &layer) {
-            (&Version::Mpeg1, &Layer::LayerI) => BITRATE_INDEX[0][bitrate_index],
-            (&Version::Mpeg1, &Layer::LayerII) => BITRATE_INDEX[1][bitrate_index],
-            (&Version::Mpeg1, &Layer::LayerIII) => BITRATE_INDEX[2][bitrate_index],
-            (_, &Layer::LayerI) => BITRATE_INDEX[3][bitrate_index],
+        let rate = match (version, layer) {
+            (Version::Mpeg1, Layer::LayerI) => BITRATE_INDEX[0][bitrate_index],
+            (Version::Mpeg1, Layer::LayerII) => BITRATE_INDEX[1][bitrate_index],
+            (Version::Mpeg1, Layer::LayerIII) => BITRATE_INDEX[2][bitrate_index],
+            (_, Layer::LayerI) => BITRATE_INDEX[3][bitrate_index],
             (_, _) => BITRATE_INDEX[4][bitrate_index],
         };
 
@@ -136,10 +136,10 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         return Err(Mp3Error::HeaderError);
     }
 
-    let sampling_rate = match &version {
-        &Version::Mpeg1 => SAMPLING_RATE[0][sampling_rate_index],
-        &Version::Mpeg2 => SAMPLING_RATE[1][sampling_rate_index],
-        &Version::Mpeg2_5 => SAMPLING_RATE[2][sampling_rate_index],
+    let sampling_rate = match version {
+        Version::Mpeg1 => SAMPLING_RATE[0][sampling_rate_index],
+        Version::Mpeg2 => SAMPLING_RATE[1][sampling_rate_index],
+        Version::Mpeg2_5 => SAMPLING_RATE[2][sampling_rate_index],
         _ => return Err(Mp3Error::HeaderError),
     };
 
@@ -157,15 +157,15 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
 
     let mode_extension_bits = header[3] & 0x30_u8;
 
-    let mode_extension = match &layer {
-        &Layer::LayerIII => match mode_extension_bits {
+    let mode_extension = match layer {
+        Layer::LayerIII => match mode_extension_bits {
             0 => ModeExtension::Stereo(false, false),
             0x10_u8 => ModeExtension::Stereo(true, false),
             0x20_u8 => ModeExtension::Stereo(false, true),
             0x30_u8 => ModeExtension::Stereo(true, true),
             _ => unreachable!(),
         },
-        &Layer::LayerI | &Layer::LayerII => match mode_extension_bits {
+        Layer::LayerI | Layer::LayerII => match mode_extension_bits {
             0 => ModeExtension::Bands(4),
             0x10_u8 => ModeExtension::Bands(8),
             0x20_u8 => ModeExtension::Bands(12),
