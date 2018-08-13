@@ -107,8 +107,7 @@ pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
         _ => return Err(Mp3Error::HeaderError),
     };
 
-    // Protected if the bit is 0
-    let protection = header[1] & 0x01_u8 == 0;
+    let protection = header[1] & 0x01_u8 != 0;
 
     let bitrate_index = (header[2] >> 4) as usize;
 
