@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
+pub mod frame;
 pub mod header;
 pub mod tables;
 
-use header::*;
+use std::io;
 use std::str;
 
 pub static ID3V1_LEN: usize = 128;
@@ -14,7 +15,14 @@ pub enum Mp3Error {
     ID3Error,
     // Incorrect Header
     HeaderError,
+    IoError(io::Error),
     Utf8Error(str::Utf8Error),
+}
+
+impl From<io::Error> for Mp3Error {
+    fn from(e: io::Error) -> Mp3Error {
+        Mp3Error::IoError(e)
+    }
 }
 
 impl From<str::Utf8Error> for Mp3Error {
@@ -43,38 +51,6 @@ pub fn trim_data(data: &[u8]) -> Result<&[u8], Mp3Error> {
                 b"TAG" => return Ok(&data[..start_of_tag]),
                 _ => return Err(Mp3Error::ID3Error),
             }
-        }
-    }
-}
-
-pub fn frame_size(header: &FrameHeader) -> Option<usize> {
-    match header.bitrate {
-        Bitrate::FreeFormat => None,
-
-        Bitrate::Indexed(bitrate) => {
-            // The number of bytes a slot occupies
-            // This is described in sections 2.1 and 2.4.2.1 of ISO/IEC 11172-3
-            let slot_size = match header.layer {
-                Layer::LayerI => 4_usize,
-                _ => 1_usize,
-            };
-
-            // Now compute the number of slots.
-            // This is described in section 2.4.3.1 of ISO/IEC 11172-3
-
-            let multiplier = match header.layer {
-                Layer::LayerI => 12,
-                _ => 144000,
-            };
-
-            let mut slot_count =
-                (multiplier * (bitrate as usize)) / (header.sampling_rate as usize);
-
-            if header.padding {
-                slot_count += 1;
-            }
-
-            Some(slot_count * slot_size)
         }
     }
 }
