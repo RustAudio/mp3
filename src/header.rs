@@ -84,6 +84,40 @@ pub struct FrameHeader {
     emphasis: Emphasis,
 }
 
+impl FrameHeader {
+    pub fn frame_size(&self) -> Option<usize> {
+        match self.bitrate {
+            Bitrate::FreeFormat => None,
+
+            Bitrate::Indexed(bitrate) => {
+                // The number of bytes a slot occupies
+                // This is described in sections 2.1 and 2.4.2.1 of ISO/IEC 11172-3
+                let slot_size = match self.layer {
+                    Layer::LayerI => 4_usize,
+                    _ => 1_usize,
+                };
+
+                // Now compute the number of slots.
+                // This is described in section 2.4.3.1 of ISO/IEC 11172-3
+
+                let multiplier = match self.layer {
+                    Layer::LayerI => 12,
+                    _ => 144000,
+                };
+
+                let mut slot_count =
+                    (multiplier * (bitrate as usize)) / (self.sampling_rate as usize);
+
+                if self.padding {
+                    slot_count += 1;
+                }
+
+                Some(slot_count * slot_size)
+            }
+        }
+    }
+}
+
 pub fn parse_frame_header(data: &[u8]) -> Result<FrameHeader, Mp3Error> {
     let header = &data[..4];
 
