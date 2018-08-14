@@ -2,42 +2,8 @@ use std::io::ErrorKind;
 use std::io::Read;
 use smallvec::SmallVec;
 
-use header::{parse_frame_header, Bitrate, FrameHeader, Layer};
+use header::{parse_frame_header, FrameHeader};
 use Mp3Error;
-
-impl FrameHeader {
-    pub fn frame_size(&self) -> Option<usize> {
-        match self.bitrate {
-            Bitrate::FreeFormat => None,
-
-            Bitrate::Indexed(bitrate) => {
-                // The number of bytes a slot occupies
-                // This is described in sections 2.1 and 2.4.2.1 of ISO/IEC 11172-3
-                let slot_size = match self.layer {
-                    Layer::LayerI => 4_usize,
-                    _ => 1_usize,
-                };
-
-                // Now compute the number of slots.
-                // This is described in section 2.4.3.1 of ISO/IEC 11172-3
-
-                let multiplier = match self.layer {
-                    Layer::LayerI => 12,
-                    _ => 144000,
-                };
-
-                let mut slot_count =
-                    (multiplier * (bitrate as usize)) / (self.sampling_rate as usize);
-
-                if self.padding {
-                    slot_count += 1;
-                }
-
-                Some(slot_count * slot_size)
-            }
-        }
-    }
-}
 
 pub struct Frame {
     header: FrameHeader,
