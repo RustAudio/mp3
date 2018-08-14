@@ -76,7 +76,7 @@ impl<R: Read> FrameReader<R> {
             self.rdr.read_exact(&mut data)?;
             Ok(Some(Frame { header, data }))
         } else {
-            unimplemented!()
+            unimplemented!("Free format not implemented")
         }
     }
 }
