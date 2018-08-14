@@ -34,8 +34,8 @@ impl From<str::Utf8Error> for Mp3Error {
     }
 }
 
-// Trim ID3 tag from data and find first frame
-pub fn trim_data(data: &[u8]) -> Result<&[u8], Mp3Error> {
+/// Strip ID3 tag from data and find first frame
+pub fn strip_id3(data: &[u8]) -> Result<&[u8], Mp3Error> {
     // Check if it is ID3v2
     match &data[..3] {
         b"ID3" => {

@@ -10,7 +10,7 @@ fn main() {
     let mut f = File::open(path).unwrap();
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).unwrap();
-    let slice = mp3::trim_data(&buf).unwrap();
+    let slice = mp3::strip_id3(&buf).unwrap();
     let mut frame_reader = FrameReader::new(slice);
     while let Some(v) = frame_reader.next_frame().unwrap() {
         println!("{:?}", v.header());
