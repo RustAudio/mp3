@@ -1,5 +1,6 @@
 use std::io::ErrorKind;
 use std::io::Read;
+use smallvec::SmallVec;
 
 use header::{parse_frame_header, Bitrate, FrameHeader, Layer};
 use Mp3Error;
@@ -40,7 +41,8 @@ impl FrameHeader {
 
 pub struct Frame {
     header: FrameHeader,
-    data: Vec<u8>,
+    // TODO find out which number would be useful here.
+    data: SmallVec<[u8; 256]>,
 }
 
 impl Frame {
@@ -62,6 +64,8 @@ impl<R: Read> FrameReader<R> {
         match self.rdr.read_exact(&mut header_data) {
             Ok(_) => (),
             Err(e) => {
+                // If we reached the end of the file, let's return None,
+                // otherwise pass on the error.
                 if e.kind() == ErrorKind::UnexpectedEof {
                     return Ok(None);
                 } else {
@@ -72,7 +76,7 @@ impl<R: Read> FrameReader<R> {
         let header = parse_frame_header(&header_data)?;
         let len = header.frame_size();
         if let Some(len) = len {
-            let mut data = vec![0; len - 4];
+            let mut data = smallvec![0; len - 4];
             self.rdr.read_exact(&mut data)?;
             Ok(Some(Frame { header, data }))
         } else {

@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+#[macro_use]
+extern crate smallvec;
+
 pub mod frame;
 pub mod header;
 pub mod tables;
