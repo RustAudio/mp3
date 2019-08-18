@@ -1,5 +1,5 @@
-use tables::*;
-use Mp3Error;
+use crate::tables::*;
+use crate::Mp3Error;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Version {

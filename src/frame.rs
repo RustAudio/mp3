@@ -2,8 +2,8 @@ use std::io::ErrorKind;
 use std::io::Read;
 use smallvec::SmallVec;
 
-use header::{parse_frame_header, FrameHeader};
-use Mp3Error;
+use crate::header::{parse_frame_header, FrameHeader};
+use crate::Mp3Error;
 
 pub struct Frame {
     header: FrameHeader,
