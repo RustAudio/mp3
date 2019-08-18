@@ -44,15 +44,15 @@ pub fn strip_id3(data: &[u8]) -> Result<&[u8], Mp3Error> {
                 + (data[8] as usize) * 128
                 + (data[9] as usize);
 
-            return Ok(&data[10 + id3_len..]);
+            Ok(&data[10 + id3_len..])
         }
         _ => {
             let start_of_tag = data.len() - ID3V1_LEN;
 
             // Check if it is ID3v1
             match &data[start_of_tag..start_of_tag + 3] {
-                b"TAG" => return Ok(&data[..start_of_tag]),
-                _ => return Err(Mp3Error::ID3Error),
+                b"TAG" => Ok(&data[..start_of_tag]),
+                _ => Err(Mp3Error::ID3Error),
             }
         }
     }

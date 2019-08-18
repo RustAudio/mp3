@@ -102,7 +102,7 @@ impl FrameHeader {
 
                 let multiplier = match self.layer {
                     Layer::LayerI => 12,
-                    _ => 144000,
+                    _ => 144_000,
                 };
 
                 let mut slot_count =

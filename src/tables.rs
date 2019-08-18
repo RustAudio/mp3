@@ -1,4 +1,4 @@
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 
 // Bitrate Lookup Table
 // |----|--------|--------|--------|-------------|
