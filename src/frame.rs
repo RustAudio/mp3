@@ -1,6 +1,6 @@
+use smallvec::SmallVec;
 use std::io::ErrorKind;
 use std::io::Read;
-use smallvec::SmallVec;
 
 use crate::header::{parse_frame_header, FrameHeader};
 use crate::Mp3Error;
